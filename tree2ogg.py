@@ -4,20 +4,21 @@ import fnmatch
 import subprocess
 import multiprocessing
 import signal
+import argparse
 
 
 
-def main(src_path, dst_path):
-    pool = SubprocessPool(6)
+def main(args):
+    pool = SubprocessPool(args.jobs)
 
-    for root, dirs, files in os.walk(src_path):
+    for root, dirs, files in os.walk(args.src_dir):
         flac_files = fnmatch.filter(files, "*.flac")
 
         if not flac_files:
             continue
 
-        rel_dir = os.path.relpath(root, src_path)
-        target_dir = os.path.join(dst_path, rel_dir)
+        rel_dir = os.path.relpath(root, args.src_dir)
+        target_dir = os.path.join(args.dst_dir, rel_dir)
 
         try:
             os.makedirs(target_dir)
@@ -29,7 +30,7 @@ def main(src_path, dst_path):
             name_wo_ext = os.path.splitext(name)[0]
             target_name = name_wo_ext + '.ogg'
         
-            target_file = os.path.join(dst_path, rel_dir, target_name)
+            target_file = os.path.join(args.dst_dir, rel_dir, target_name)
             src_file = os.path.join(root, name)
             ogg_enc(pool, src_file, target_file)
 
@@ -69,4 +70,19 @@ class SubprocessPool:
 
 
 if __name__ == '__main__':
-    main(sys.argv[1], sys.argv[2])
+    parser = argparse.ArgumentParser()
+    parser.add_argument("src_dir", help="source directory to transcode")
+    parser.add_argument("dst_dir", help="destination directory")
+
+    parser.add_argument("-j", "--jobs", help="number of simultaneous encoding"
+                        "process to spawn", default=0, type=int)
+    args = parser.parse_args()
+
+    if args.jobs <= 0:
+        try:
+            args.jobs = multiprocessing.cpu_count()
+        except NotImplementedError:
+            args.jobs = 1
+
+
+    main(args)
