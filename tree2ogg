@@ -8,41 +8,50 @@ import argparse
 import logging
 
 
-def main(args):
-    pool = SubprocessPool(args.jobs)
+class Tree2Ogg:
+    def __init__(self, src, dst):
+        self.src = src
+        self.dst = dst
 
-    for root, _, files in os.walk(args.src_dir):
-        flac_files = fnmatch.filter(files, "*.flac")
+    def run(self, num_of_jobs):
+        self._pool = SubprocessPool(num_of_jobs)
 
-        if not flac_files:
-            continue
+        for root, _, files in os.walk(self.src):
+            flac_files = fnmatch.filter(files, "*.flac")
 
-        rel_dir = os.path.relpath(root, args.src_dir)
-        target_dir = os.path.join(args.dst_dir, rel_dir)
+            if not flac_files:
+                continue
 
-        try:
-            os.makedirs(target_dir)
-        except OSError, e:
-            if e.errno != 17: # File exists
-                raise
+            for name in flac_files:
+                src_file = os.path.join(root, name)
+                self._create_directories(src_file)
+                self._encode_file(src_file)
 
-        for name in flac_files:
-            name_wo_ext = os.path.splitext(name)[0]
-            target_name = name_wo_ext + '.ogg'
-        
-            target_file = os.path.join(args.dst_dir, rel_dir, target_name)
-            src_file = os.path.join(root, name)
-            logging.info("Converting %s to %s", src_file, target_file)
-            ogg_enc(pool, src_file, target_file)
+            self._pool.wait()
 
-        pool.wait()
+    def _create_directories(self, filepath):
+        """Create the target directories needed for converting a given file."""
+        dirname = os.path.dirname(filepath)
+        relative_dirname = os.path.relpath(dirname, self.src)
+        dst_dirname = os.path.join(self.dst, relative_dirname)
 
+        if not os.path.isdir(dst_dirname):
+            logging.debug("Creating directory: %s", dst_dirname)
+            os.makedirs(dst_dirname)
 
-def ogg_enc(pool, src_file, dst_file):
-    args = ['oggenc', '--quality', '5', '--quiet', '--output', dst_file, src_file]
+    def _encode_file(self, filepath):
+        """Encode a flac file to ogg."""
+        dirname, filename = os.path.split(filepath)
+        name_wo_ext = os.path.splitext(filename)[0]
+        target_name = name_wo_ext + '.ogg'
 
-    pool.popen(args)
+        rel_dir = os.path.relpath(dirname, self.src)
+        target_file = os.path.join(self.dst, rel_dir, target_name)
 
+        logging.info("Converting %s to %s", filepath, target_file)
+        args = ['oggenc', '--quality', '5', '--quiet', '--output', target_file, filepath]
+
+        self._pool.popen(args)
 
 class SubprocessPool:
     def __init__(self, max_jobs):
@@ -89,6 +98,4 @@ if __name__ == '__main__':
             args.jobs = multiprocessing.cpu_count()
         except NotImplementedError:
             args.jobs = 1
-
-
-    main(args)
+    Tree2Ogg(args.src_dir, args.dst_dir).run(args.jobs)
