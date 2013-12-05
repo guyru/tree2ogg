@@ -56,6 +56,13 @@ class Tree2Ogg:
 class SubprocessPool:
     def __init__(self, max_jobs):
         self.max_jobs = max_jobs
+        if self.max_jobs <= 0:
+            try:
+                self.max_jobs = multiprocessing.cpu_count()
+            except NotImplementedError:
+                self.max_jobs = 1
+        logging.debug("Set number of jobs to %d.", self.max_jobs)
+
         self.jobs = set()
         signal.signal(signal.SIGCHLD, self._sigchld)
 
@@ -93,9 +100,4 @@ if __name__ == '__main__':
     logging_level = logging.ERROR - args.verbose * 10
     logging.basicConfig(format="%(message)s", level=logging_level)
 
-    if args.jobs <= 0:
-        try:
-            args.jobs = multiprocessing.cpu_count()
-        except NotImplementedError:
-            args.jobs = 1
     Tree2Ogg(args.src_dir, args.dst_dir).run(args.jobs)
