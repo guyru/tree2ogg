@@ -6,28 +6,26 @@ import multiprocessing
 import signal
 import argparse
 import logging
+import urllib
 
 
 class Tree2Ogg:
-    def __init__(self, src, dst):
+    def __init__(self, src, dst, num_of_jobs):
         self.src = src
         self.dst = dst
-
-    def run(self, num_of_jobs):
         self._pool = SubprocessPool(num_of_jobs)
 
-        for root, _, files in os.walk(self.src):
-            flac_files = fnmatch.filter(files, "*.flac")
+    def run(self):
 
-            if not flac_files:
-                continue
+        generator = self._generator_file
+        if os.path.isdir(self.src):
+            generator = self._generator_dir
 
-            for name in flac_files:
-                src_file = os.path.join(root, name)
-                self._create_directories(src_file)
-                self._encode_file(src_file)
+        for src_file in generator():
+            self._create_directories(src_file)
+            self._encode_file(src_file)
 
-            self._pool.wait()
+        self._pool.wait()
 
     def _create_directories(self, filepath):
         """Create the target directories needed for converting a given file."""
@@ -46,12 +44,46 @@ class Tree2Ogg:
         target_name = name_wo_ext + '.ogg'
 
         rel_dir = os.path.relpath(dirname, self.src)
+        # nice trick to prevent directory traversal
+        rel_dir = os.path.normpath('/' + rel_dir)[1:]
         target_file = os.path.join(self.dst, rel_dir, target_name)
 
         logging.info("Converting %s to %s", filepath, target_file)
-        args = ['oggenc', '--quality', '5', '--quiet', '--output', target_file, filepath]
+        args = ['oggenc', '--quality', '5', '--quiet', '--output',
+                target_file, filepath]
 
         self._pool.popen(args)
+
+    def _generator_dir(self):
+        for root, _, files in os.walk(self.src):
+            flac_files = fnmatch.filter(files, "*.flac")
+
+            if not flac_files:
+                continue
+
+            for name in flac_files:
+                src_file = os.path.join(root, name)
+                yield src_file
+
+    def _generator_file(self):
+        first_line = True
+        m3u_playlist = False
+        for line in open(self.src, 'rb'):
+            line = line.rstrip('\n')
+            if first_line:
+                m3u_playlist = line.startswith('#EXTM3U')
+                first_line = False
+            if m3u_playlist:
+                if line.startswith('#'):
+                    continue
+                if line.startswith('file://'):
+                    line = line[len('file://'):]
+                line = urllib.unquote(line)
+            if not line.startswith('/'):
+                # path is relative
+                line = os.path.join(os.path.dirname(self.src), line)
+            yield line
+
 
 class SubprocessPool:
     def __init__(self, max_jobs):
@@ -61,12 +93,12 @@ class SubprocessPool:
                 self.max_jobs = multiprocessing.cpu_count()
             except NotImplementedError:
                 self.max_jobs = 1
-        logging.debug("Set number of jobs to %d.", self.max_jobs)
 
         self.jobs = set()
         signal.signal(signal.SIGCHLD, self._sigchld)
 
     def _sigchld(self, signum, frame):
+        logging.debug("SIGCHLD")
         done_jobs = set()
         for p in self.jobs:
             if p.poll() != None:
@@ -85,19 +117,25 @@ class SubprocessPool:
             signal.pause()
 
 
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("src_dir", help="source directory to transcode")
+def main():
+    description = "Convert a directory tree of FLAC files to Ogg."
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument("src", help=("Source directory to transcode. Instead"
+                        " of passing a directory, you can also pass a m3u "
+                        "playlist file. In that case output files will be "
+                        "created in `dst` relative to playlist file."))
     parser.add_argument("dst_dir", help="destination directory")
 
     parser.add_argument("-j", "--jobs", help=("number of simultaneous encoding"
                         " process to spawn"), default=0, type=int)
-    parser.add_argument('-v', '--verbose', help="be more verbose",
+    parser.add_argument('-v', '--verbose', help="increase output verbosity",
                         action='count', default=0)
     args = parser.parse_args()
 
     logging_level = logging.ERROR - args.verbose * 10
     logging.basicConfig(format="%(message)s", level=logging_level)
 
-    Tree2Ogg(args.src_dir, args.dst_dir).run(args.jobs)
+    Tree2Ogg(args.src, args.dst_dir, args.jobs).run()
+
+if __name__ == '__main__':
+    main()
