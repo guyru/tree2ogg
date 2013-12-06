@@ -1,4 +1,41 @@
 #! /usr/bin/python
+
+###########################################################################
+ #   Copyright (C) 2013 by Guy Rutenberg                                   #
+ #   http://www.guyrutenberg.com/                                          #
+ #                                                                         #
+ #   This program is free software; you can redistribute it and/or modify  #
+ #   it under the terms of the GNU General Public License as published by  #
+ #   the Free Software Foundation; either version 2 of the License, or     #
+ #   (at your option) any later version.                                   #
+ #                                                                         #
+ #   This program is distributed in the hope that it will be useful,       #
+ #   but WITHOUT ANY WARRANTY; without even the implied warranty of        #
+ #   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+ #   GNU General Public License for more details.                          #
+ #                                                                         #
+ #   You should have received a copy of the GNU General Public License     #
+ #   along with this program; if not, write to the                         #
+ #   Free Software Foundation, Inc.,                                       #
+ #   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             #
+############################################################################
+
+"""
+usage: tree2ogg [-h] [-j JOBS] [-v] [--version] src dst_dir
+
+Convert a directory tree of FLAC files to Ogg.
+
+positional arguments:
+  src                   source directory/playlist
+  dst_dir               destination directory
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -j JOBS, --jobs JOBS  number of simultaneous encoding process to spawn
+  -v, --verbose         increase output verbosity
+  --version             show program's version number and exit
+"""
+
 import os
 import fnmatch
 import subprocess
@@ -8,12 +45,19 @@ import argparse
 import logging
 import urllib
 
+__version__ = '0.1'
 
 class Tree2Ogg:
-    def __init__(self, src, dst, num_of_jobs):
+    def __init__(self, src, dst, num_of_jobs, oggenc_args):
         self.src = src
         self.dst = dst
         self._pool = SubprocessPool(num_of_jobs)
+
+        self._oggenc_args = ['oggenc', '--quality', '5']
+        if logging.getLogger().level > logging.INFO:
+            self._oggenc_args.append('--quiet')
+
+        self._oggenc_args += oggenc_args
 
     def run(self):
 
@@ -48,9 +92,7 @@ class Tree2Ogg:
         rel_dir = os.path.normpath('/' + rel_dir)[1:]
         target_file = os.path.join(self.dst, rel_dir, target_name)
 
-        logging.info("Converting %s to %s", filepath, target_file)
-        args = ['oggenc', '--quality', '5', '--quiet', '--output',
-                target_file, filepath]
+        args = self._oggenc_args + ['--output', target_file, filepath]
 
         self._pool.popen(args)
 
@@ -120,22 +162,23 @@ class SubprocessPool:
 def main():
     description = "Convert a directory tree of FLAC files to Ogg."
     parser = argparse.ArgumentParser(description=description)
-    parser.add_argument("src", help=("Source directory to transcode. Instead"
-                        " of passing a directory, you can also pass a m3u "
-                        "playlist file. In that case output files will be "
-                        "created in `dst` relative to playlist file."))
+    parser.add_argument("src", help="source directory/playlist")
     parser.add_argument("dst_dir", help="destination directory")
+    parser.add_argument(nargs=argparse.REMAINDER, dest="oggenc_args",
+                        help="additional arguments to pass to oggenc")
 
     parser.add_argument("-j", "--jobs", help=("number of simultaneous encoding"
                         " process to spawn"), default=0, type=int)
     parser.add_argument('-v', '--verbose', help="increase output verbosity",
                         action='count', default=0)
+    parser.add_argument('--version', action="version",
+                        version="%(prog)s " + __version__)
     args = parser.parse_args()
 
     logging_level = logging.ERROR - args.verbose * 10
     logging.basicConfig(format="%(message)s", level=logging_level)
 
-    Tree2Ogg(args.src, args.dst_dir, args.jobs).run()
+    Tree2Ogg(args.src, args.dst_dir, args.jobs, args.oggenc_args).run()
 
 if __name__ == '__main__':
     main()
