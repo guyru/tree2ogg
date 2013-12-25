@@ -13,20 +13,21 @@ def read(fname):
 setup(
     name='tree2ogg',
     version='0.1',
-    # TODO: add descrition
+    description=('A script that allows recursively transcode '
+                 'directories/playlists of FLAC files to Ogg.'),
     url='http://www.guyrutenberg.com/',
     author='Guy Rutenberg',
     author_email='guyrutenberg@gmail.com',
     license = 'GPLv2+',
     scripts=['tree2ogg'],
     long_description=read('README.rst'),
-    package_data={'radiopy': ['data/radiopy.default']},
+    include_package_data=True,
 
-    # TODO: add classifiers
-    # classifiers = [
-    #     'Environment :: Console',
-    #     'Intended Audience :: End Users/Desktop'
-    #     'License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)'
-    #     ],
+    classifiers = [
+        'Environment :: Console',
+        'Intended Audience :: End Users/Desktop',
+        'License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)',
+        'Development Status :: 4 - Beta',
+        ],
 )
 
