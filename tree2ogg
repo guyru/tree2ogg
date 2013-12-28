@@ -45,7 +45,7 @@ import argparse
 import logging
 import urllib
 
-__version__ = '0.1'
+__version__ = '0.1.1'
 
 class Tree2Ogg:
     def __init__(self, src, dst, num_of_jobs, oggenc_args):
@@ -75,6 +75,7 @@ class Tree2Ogg:
         """Create the target directories needed for converting a given file."""
         dirname = os.path.dirname(filepath)
         relative_dirname = os.path.relpath(dirname, self.src)
+        relative_dirname = os.path.normpath('/' + relative_dirname)[1:]
         dst_dirname = os.path.join(self.dst, relative_dirname)
 
         if not os.path.isdir(dst_dirname):

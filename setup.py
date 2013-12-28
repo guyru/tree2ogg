@@ -10,9 +10,16 @@ from setuptools import setup
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
+def get_version(filename):
+    """Extract __version__ from file by parsing it."""
+    with open(filename) as fp:
+        for line in fp:
+            if line.startswith('__version__'):
+                exec(line)
+                return __version__
 setup(
     name='tree2ogg',
-    version='0.1',
+    version=get_version('tree2ogg'),
     description=('A script that allows recursively transcode '
                  'directories/playlists of FLAC files to Ogg.'),
     url='http://www.guyrutenberg.com/',
