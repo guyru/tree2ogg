@@ -45,19 +45,20 @@ import argparse
 import logging
 import urllib
 
-__version__ = '0.1.1'
+__version__ = '0.2.0'
 
 class Tree2Ogg:
-    def __init__(self, src, dst, num_of_jobs, oggenc_args):
-        self.src = src
-        self.dst = dst
-        self._pool = SubprocessPool(num_of_jobs)
+    def __init__(self, args):
+        for attr in ['src', 'dst_dir', 'skip', 'force']:
+            setattr(self, attr, getattr(args, attr))
+
+        self._pool = SubprocessPool(args.jobs)
 
         self._oggenc_args = ['oggenc', '--quality', '5']
         if logging.getLogger().level > logging.INFO:
             self._oggenc_args.append('--quiet')
 
-        self._oggenc_args += oggenc_args
+        self._oggenc_args += args.oggenc_args
 
     def run(self):
 
@@ -76,7 +77,7 @@ class Tree2Ogg:
         dirname = os.path.dirname(filepath)
         relative_dirname = os.path.relpath(dirname, self.src)
         relative_dirname = os.path.normpath('/' + relative_dirname)[1:]
-        dst_dirname = os.path.join(self.dst, relative_dirname)
+        dst_dirname = os.path.join(self.dst_dir, relative_dirname)
 
         if not os.path.isdir(dst_dirname):
             logging.debug("Creating directory: %s", dst_dirname)
@@ -90,12 +91,25 @@ class Tree2Ogg:
 
         rel_dir = os.path.relpath(dirname, self.src)
         # nice trick to prevent directory traversal
-        rel_dir = os.path.normpath('/' + rel_dir)[1:]
-        target_file = os.path.join(self.dst, rel_dir, target_name)
+        rel_dir = os.path.normpath('/' + rel_dir).lstrip('/')
+        target_file = os.path.join(self.dst_dir, rel_dir, target_name)
+
+        if os.path.exists(target_file) and self.skip == True:
+            logging.warning('Skipping file: %s', filepath)
+            return False
+        elif os.path.exists(target_file) and self.force == False:
+            # We should check the timestamp of the target and compare it with
+            # the source.
+            if os.path.getmtime(target_file) > os.path.getmtime(filepath):
+                # target is probably up-to-date.
+                logging.warning('Skipping file: %s', filepath)
+                return False
+
 
         args = self._oggenc_args + ['--output', target_file, filepath]
 
         self._pool.popen(args)
+        return True
 
     def _generator_dir(self):
         for root, _, files in os.walk(self.src):
@@ -170,6 +184,12 @@ def main():
 
     parser.add_argument("-j", "--jobs", help=("number of simultaneous encoding"
                         " process to spawn"), default=0, type=int)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--force', action='store_true', default=False,
+                        help='force overwrite existing files')
+    group.add_argument('--skip', action='store_true', default=False,
+                        help='always skip existing files')
+
     parser.add_argument('-v', '--verbose', help="increase output verbosity",
                         action='count', default=0)
     parser.add_argument('--version', action="version",
@@ -179,7 +199,7 @@ def main():
     logging_level = logging.ERROR - args.verbose * 10
     logging.basicConfig(format="%(message)s", level=logging_level)
 
-    Tree2Ogg(args.src, args.dst_dir, args.jobs, args.oggenc_args).run()
+    Tree2Ogg(args).run()
 
 if __name__ == '__main__':
     main()

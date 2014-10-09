@@ -4,6 +4,10 @@
 A script that allows recursively transcode directories/playlists of FLAC files
 to Ogg.
 
+When encountering existing files in the target directory, ``tree2ogg`` by
+default will skip them if the target's modification time is newer than the
+source. This can be changed by using the ``--force`` and ``--skip`` flags.
+
 Installation
 =============
 To install ``tree2ogg``, use pip::
@@ -18,7 +22,8 @@ Synopsis
 ========
 ::
 
-  usage: tree2ogg [-h] [-j JOBS] [-v] [--version] src dst_dir ...
+  usage: tree2ogg [-h] [-j JOBS] [--force | --skip] [-v] [--version]
+                  src dst_dir ...
   
   Convert a directory tree of FLAC files to Ogg.
   
@@ -30,5 +35,7 @@ Synopsis
   optional arguments:
     -h, --help            show this help message and exit
     -j JOBS, --jobs JOBS  number of simultaneous encoding process to spawn
+    --force               force overwrite existing files
+    --skip                always skip existing files
     -v, --verbose         increase output verbosity
     --version             show program's version number and exit
