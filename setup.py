@@ -22,7 +22,7 @@ setup(
     version=get_version('tree2ogg/__init__.py'),
     description=('A script that allows recursively transcode '
                  'directories/playlists of FLAC files to Ogg.'),
-    url='http://www.guyrutenberg.com/',
+    url='https://github.com/guyru/tree2ogg/',
     author='Guy Rutenberg',
     author_email='guyrutenberg@gmail.com',
     license = 'GPLv2+',

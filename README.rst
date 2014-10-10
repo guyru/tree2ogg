@@ -39,3 +39,9 @@ Synopsis
     --skip                always skip existing files
     -v, --verbose         increase output verbosity
     --version             show program's version number and exit
+
+Credits
+=======
+* Author: `Guy Rutenberg`_
+
+.. _`Guy Rutenberg`: http://www.guyrutenberg.com/
