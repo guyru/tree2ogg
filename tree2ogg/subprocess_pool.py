@@ -36,13 +36,22 @@ class SubprocessPool:
         signal.signal(signal.SIGCHLD, self._sigchld)
 
     def _sigchld(self, signum, frame):
-        logging.debug("SIGCHLD")
+        """SIGCHLD handler responsible for removing dead processes from
+        the pool"""
+        # Make sure only one SIGCHLD handler is called at a time
+        # See: http://utcc.utoronto.ca/~cks/space/blog/python/SIGCHLDSolution
+        old_signal = signal.signal(signal.SIGCHLD, signal.SIG_DFL)
+        if old_signal == signal.SIG_DFL:
+            # The signal handler is already running
+            return
+
         done_jobs = set()
         for p in self.jobs:
             if p.poll() != None:
                 done_jobs.add(p)
 
         self.jobs.difference_update(done_jobs)
+        signal.signal(signal.SIGCHLD, self._sigchld)
 
     def popen(self, *args, **kwrds):
         while len(self.jobs) >= self.max_jobs:
