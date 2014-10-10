@@ -19,16 +19,21 @@ def get_version(filename):
                 return __version__
 setup(
     name='tree2ogg',
-    version=get_version('tree2ogg'),
+    version=get_version('tree2ogg/__init__.py'),
     description=('A script that allows recursively transcode '
                  'directories/playlists of FLAC files to Ogg.'),
     url='http://www.guyrutenberg.com/',
     author='Guy Rutenberg',
     author_email='guyrutenberg@gmail.com',
     license = 'GPLv2+',
-    scripts=['tree2ogg'],
+    packages=['tree2ogg'],
     long_description=read('README.rst'),
     include_package_data=True,
+    entry_points = {
+        'console_scripts': [
+            'tree2ogg = tree2ogg.__main__:run',
+        ]
+    },
 
     classifiers = [
         'Environment :: Console',

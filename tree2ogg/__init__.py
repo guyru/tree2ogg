@@ -1,7 +1,5 @@
-#! /usr/bin/python
-
 ###########################################################################
- #   Copyright (C) 2013 by Guy Rutenberg                                   #
+ #   Copyright (C) 2013-2014 by Guy Rutenberg                              #
  #   http://www.guyrutenberg.com/                                          #
  #                                                                         #
  #   This program is free software; you can redistribute it and/or modify  #
@@ -38,12 +36,9 @@ optional arguments:
 
 import os
 import fnmatch
-import subprocess
-import multiprocessing
-import signal
-import argparse
 import logging
 import urllib
+from subprocess_pool import SubprocessPool
 
 __version__ = '0.2.0'
 
@@ -140,66 +135,3 @@ class Tree2Ogg:
                 # path is relative
                 line = os.path.join(os.path.dirname(self.src), line)
             yield line
-
-
-class SubprocessPool:
-    def __init__(self, max_jobs):
-        self.max_jobs = max_jobs
-        if self.max_jobs <= 0:
-            try:
-                self.max_jobs = multiprocessing.cpu_count()
-            except NotImplementedError:
-                self.max_jobs = 1
-
-        self.jobs = set()
-        signal.signal(signal.SIGCHLD, self._sigchld)
-
-    def _sigchld(self, signum, frame):
-        logging.debug("SIGCHLD")
-        done_jobs = set()
-        for p in self.jobs:
-            if p.poll() != None:
-                done_jobs.add(p)
-
-        self.jobs.difference_update(done_jobs)
-
-    def popen(self, *args, **kwrds):
-        while len(self.jobs) >= self.max_jobs:
-            signal.pause()
-        self.jobs.add(subprocess.Popen(*args, **kwrds))
-
-    def wait(self):
-        """Wait for all the jobs to terminate"""
-        while len(self.jobs) > 0:
-            signal.pause()
-
-
-def main():
-    description = "Convert a directory tree of FLAC files to Ogg."
-    parser = argparse.ArgumentParser(description=description)
-    parser.add_argument("src", help="source directory/playlist")
-    parser.add_argument("dst_dir", help="destination directory")
-    parser.add_argument(nargs=argparse.REMAINDER, dest="oggenc_args",
-                        help="additional arguments to pass to oggenc")
-
-    parser.add_argument("-j", "--jobs", help=("number of simultaneous encoding"
-                        " process to spawn"), default=0, type=int)
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument('--force', action='store_true', default=False,
-                        help='force overwrite existing files')
-    group.add_argument('--skip', action='store_true', default=False,
-                        help='always skip existing files')
-
-    parser.add_argument('-v', '--verbose', help="increase output verbosity",
-                        action='count', default=0)
-    parser.add_argument('--version', action="version",
-                        version="%(prog)s " + __version__)
-    args = parser.parse_args()
-
-    logging_level = logging.ERROR - args.verbose * 10
-    logging.basicConfig(format="%(message)s", level=logging_level)
-
-    Tree2Ogg(args).run()
-
-if __name__ == '__main__':
-    main()
